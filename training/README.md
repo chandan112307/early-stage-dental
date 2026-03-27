@@ -83,7 +83,7 @@ python -m training --epochs 100 --batch-size 8 --learning-rate 0.001
 
 All dataset operations are centralized in `data/dataset_utils.py`:
 
-- **Download**: Fetches from Kaggle automatically
+- **Download**: Fetches DentalAI dataset via `dataset-tools` automatically
 - **Convert**: Transforms raw formats (e.g. Supervisely) into canonical structure
 - **Validate**: Hard gate — training will not start unless required directories exist
 

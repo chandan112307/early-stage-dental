@@ -16,11 +16,8 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-import subprocess
 import sys
 from pathlib import Path
-
-from training.configs.config import KAGGLE_DATASET_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -70,56 +67,23 @@ def ensure_dataset(dataset_path: Path) -> Path:
 # ------------------------------------------------------------------
 
 def _download_dataset(dataset_path: Path) -> None:
-    """Attempt to download the dataset.  Terminates on failure."""
-    kaggle_dataset = KAGGLE_DATASET_NAME
+    """Download the DentalAI dataset via dataset-tools.  Terminates on failure.
 
-    # Try kagglehub first
+    This is the **only** dataset acquisition logic in the entire codebase.
+    There are no alternative sources, no fallbacks, and no retry with
+    other providers.  If the download fails, execution stops immediately.
+    """
     try:
-        import kagglehub  # type: ignore[import-untyped]
+        import dataset_tools as dtools  # type: ignore[import-untyped]
 
-        print(f"[INFO] Downloading dataset via kagglehub: {kaggle_dataset} …")
-        downloaded = kagglehub.dataset_download(kaggle_dataset)
-        downloaded_path = Path(downloaded)
-
-        # Move into the canonical location if different
-        if downloaded_path.resolve() != dataset_path.resolve():
-            dataset_path.mkdir(parents=True, exist_ok=True)
-            for item in downloaded_path.iterdir():
-                dest = dataset_path / item.name
-                if item.is_dir():
-                    shutil.copytree(item, dest, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(item, dest)
-
-        print(f"[INFO] Dataset downloaded to {dataset_path}")
-        return
-    except Exception as exc:
-        print(f"[WARN] kagglehub download failed: {exc}")
-
-    # Fallback: Kaggle CLI
-    try:
+        print("[INFO] Downloading DentalAI dataset via dataset-tools …")
         dataset_path.mkdir(parents=True, exist_ok=True)
-
-        subprocess.run(
-            [
-                "kaggle",
-                "datasets",
-                "download",
-                "-d",
-                kaggle_dataset,
-                "--unzip",
-                "-p",
-                str(dataset_path),
-            ],
-            check=True,
-        )
-        print(f"[INFO] Dataset downloaded via Kaggle CLI to {dataset_path}")
-        return
+        dtools.download(dataset="Dentalai", dst_dir=str(dataset_path))
+        print(f"[INFO] Dataset downloaded to {dataset_path}")
     except Exception as exc:
-        print(f"[WARN] Kaggle CLI download failed: {exc}")
-
-    print("[FATAL] Could not acquire dataset. Terminating.")
-    sys.exit(1)
+        print(f"[FATAL] Dataset acquisition failed: {exc}")
+        print("[FATAL] Could not acquire dataset. Terminating.")
+        sys.exit(1)
 
 
 # ------------------------------------------------------------------

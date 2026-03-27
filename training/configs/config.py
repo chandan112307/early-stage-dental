@@ -33,11 +33,6 @@ ONNX_SEGMENTOR_NAME: str = "unet_segmentor.onnx"
 BACKEND_METRICS_FILE: str = "evaluation_metrics.json"
 
 # ---------------------------------------------------------------------------
-# Kaggle dataset identifier (used for automatic download)
-# ---------------------------------------------------------------------------
-KAGGLE_DATASET_NAME: str = "imtkaggleteam/dental-caries"
-
-# ---------------------------------------------------------------------------
 # Class definitions
 # ---------------------------------------------------------------------------
 CLASS_NAMES: List[str] = ["No Caries", "Caries"]
