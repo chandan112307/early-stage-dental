@@ -17,15 +17,8 @@ Run as a standalone script::
 
     python -m training.training.train_yolo
 
-Or with explicit paths::
-
-    python -m training.training.train_yolo \\
-        --data /path/to/data.yaml \\
-        --epochs 100 \\
-        --batch-size 16
-
-If ``--dataset`` / ``--data`` are omitted the dataset is downloaded
-automatically from Kaggle.
+All dataset preparation is handled automatically by the centralized
+dataset pipeline — no dataset arguments are needed or accepted.
 """
 
 from __future__ import annotations
@@ -44,7 +37,6 @@ from training.configs.config import (
     BATCH_SIZE,
     DATASET_DIR,
     EPOCHS,
-    KAGGLE_DATASET_NAME,
     LEARNING_RATE,
     METRICS_DIR,
     MODEL_DIR,
@@ -191,21 +183,6 @@ def parse_args() -> argparse.Namespace:
         description="Train YOLOv8 for dental caries detection.",
     )
     parser.add_argument(
-        "--dataset",
-        type=str,
-        default=None,
-        help=(
-            "Root directory of the YOLO dataset.  "
-            "If omitted the dataset is downloaded automatically from Kaggle."
-        ),
-    )
-    parser.add_argument(
-        "--data",
-        type=str,
-        default=None,
-        help="Path to data.yaml for YOLO training.",
-    )
-    parser.add_argument(
         "--model",
         type=str,
         default="yolov8n.pt",
@@ -215,23 +192,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--img-size", type=int, default=YOLO_IMG_SIZE[0])
     parser.add_argument("--learning-rate", type=float, default=LEARNING_RATE)
-    parser.add_argument("--output-dir", type=str, default=str(OUTPUT_DIR))
-    parser.add_argument("--model-dir", type=str, default=str(MODEL_DIR))
-    parser.add_argument("--metrics-dir", type=str, default=str(METRICS_DIR))
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
 
-    # Resolve data.yaml: explicit --data → --dataset dir → auto-download
-    if args.data:
-        data_yaml = Path(args.data)
-    elif args.dataset:
-        data_yaml = _find_data_yaml(Path(args.dataset))
-    else:
-        ds_path = ensure_dataset(DATASET_DIR, KAGGLE_DATASET_NAME)
-        data_yaml = _find_data_yaml(ds_path)
+    # Centralized dataset pipeline — always runs
+    ds_path = ensure_dataset(DATASET_DIR)
+    data_yaml = _find_data_yaml(ds_path)
 
     train(
         data_yaml=data_yaml,
@@ -240,7 +209,4 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         img_size=args.img_size,
         learning_rate=args.learning_rate,
-        output_dir=args.output_dir,
-        model_dir=args.model_dir,
-        metrics_dir=args.metrics_dir,
     )

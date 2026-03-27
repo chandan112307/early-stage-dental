@@ -28,7 +28,6 @@ class PipelineResult:
     classification: ClassificationResult
     bounding_boxes: list[BoundingBox]
     segmentation: SegmentationResult | None
-    demo_mode: bool
 
 
 def run_pipeline(
@@ -81,7 +80,6 @@ def run_pipeline(
             seg_input,
             original_width=w,
             original_height=h,
-            boxes=bounding_boxes,
             model=models.segmentor,
             settings=settings,
         )
@@ -92,5 +90,4 @@ def run_pipeline(
         classification=classification,
         bounding_boxes=bounding_boxes,
         segmentation=segmentation,
-        demo_mode=models.demo_mode,
     )

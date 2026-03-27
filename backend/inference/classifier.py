@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import random
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,40 +25,16 @@ class ClassificationResult:
     probabilities: dict[str, float]
 
 
-def _demo_classify() -> ClassificationResult:
-    """Generate a realistic demo classification (70% caries, 30% no caries)."""
-    is_caries = random.random() < 0.70
-    if is_caries:
-        confidence = round(random.uniform(0.72, 0.97), 4)
-        return ClassificationResult(
-            label="Caries",
-            confidence=confidence,
-            probabilities={
-                "Caries": confidence,
-                "No Caries": round(1.0 - confidence, 4),
-            },
-        )
-    confidence = round(random.uniform(0.65, 0.92), 4)
-    return ClassificationResult(
-        label="No Caries",
-        confidence=confidence,
-        probabilities={
-            "No Caries": confidence,
-            "Caries": round(1.0 - confidence, 4),
-        },
-    )
-
-
 def classify(
     preprocessed: NDArray[np.float32],
-    model: Any | None = None,
+    model: Any,
     settings: Settings | None = None,
 ) -> ClassificationResult:
     """Run classification on a preprocessed image.
 
     Args:
         preprocessed: Image tensor of shape (1, 224, 224, 3), float32, [0,1].
-        model: ONNX InferenceSession or None for demo mode.
+        model: ONNX InferenceSession (required).
         settings: Application settings.
 
     Returns:
@@ -68,11 +43,6 @@ def classify(
     if settings is None:
         settings = get_settings()
 
-    if model is None:
-        logger.info("Classifier running in DEMO mode")
-        return _demo_classify()
-
-    # Production inference path
     input_name = model.get_inputs()[0].name
     output = model.run(None, {input_name: preprocessed})
     probs = output[0][0]

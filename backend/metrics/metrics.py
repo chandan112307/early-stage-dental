@@ -6,6 +6,7 @@ import json
 import logging
 from pathlib import Path
 
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 from backend.configs.config import get_settings
@@ -13,27 +14,6 @@ from backend.configs.config import get_settings
 logger = logging.getLogger(__name__)
 
 METRICS_FILENAME = "evaluation_metrics.json"
-
-# Hardcoded demo metrics used when no real evaluation file exists
-_DEMO_METRICS: dict[str, dict[str, float]] = {
-    "classifier": {
-        "accuracy": 0.984,
-        "precision": 0.961,
-        "recall": 0.948,
-        "f1_score": 0.954,
-    },
-    "detector": {
-        "mAP50": 0.912,
-        "mAP50_95": 0.743,
-        "precision": 0.934,
-        "recall": 0.891,
-    },
-    "segmentor": {
-        "dice_coefficient": 0.887,
-        "iou": 0.821,
-        "pixel_accuracy": 0.964,
-    },
-}
 
 
 class ModelMetrics(BaseModel):
@@ -56,38 +36,37 @@ class EvaluationMetrics(BaseModel):
     classifier: ModelMetrics
     detector: ModelMetrics
     segmentor: ModelMetrics
-    demo_mode: bool = True
 
 
 def get_metrics() -> EvaluationMetrics:
-    """Load metrics from JSON file or return demo metrics.
+    """Load metrics from JSON file.
 
     Looks for ``evaluation_metrics.json`` in the model directory.
+    Raises an HTTP 503 error if the file is not available.
     """
     settings = get_settings()
     metrics_path = settings.MODEL_DIR / METRICS_FILENAME
 
-    if metrics_path.exists():
-        try:
-            data = json.loads(metrics_path.read_text())
-            logger.info("Loaded evaluation metrics from %s", metrics_path)
-            return EvaluationMetrics(
-                classifier=ModelMetrics(**data.get("classifier", {})),
-                detector=ModelMetrics(**data.get("detector", {})),
-                segmentor=ModelMetrics(**data.get("segmentor", {})),
-                demo_mode=False,
-            )
-        except Exception:
-            logger.warning(
-                "Failed to parse %s – returning demo metrics",
-                metrics_path,
-                exc_info=True,
-            )
+    if not metrics_path.exists():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Evaluation metrics not available. "
+                "Run the training pipeline first: python -m training"
+            ),
+        )
 
-    logger.info("Returning demo evaluation metrics")
-    return EvaluationMetrics(
-        classifier=ModelMetrics(**_DEMO_METRICS["classifier"]),
-        detector=ModelMetrics(**_DEMO_METRICS["detector"]),
-        segmentor=ModelMetrics(**_DEMO_METRICS["segmentor"]),
-        demo_mode=True,
-    )
+    try:
+        data = json.loads(metrics_path.read_text())
+        logger.info("Loaded evaluation metrics from %s", metrics_path)
+        return EvaluationMetrics(
+            classifier=ModelMetrics(**data.get("classifier", {})),
+            detector=ModelMetrics(**data.get("detector", {})),
+            segmentor=ModelMetrics(**data.get("segmentor", {})),
+        )
+    except Exception as exc:
+        logger.error("Failed to parse %s: %s", metrics_path, exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to parse evaluation metrics: {exc}",
+        ) from exc

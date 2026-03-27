@@ -10,7 +10,7 @@ Run the complete pipeline with **zero manual intervention**::
     python -m training --skip-deploy       # Train + export, skip backend deploy
 
 The pipeline automatically:
-1. Downloads the dataset (if not present)
+1. Downloads and validates the dataset (centralized pipeline)
 2. Trains the selected model(s)
 3. Exports trained models to ONNX format
 4. Deploys ONNX models to ``backend/models/``
@@ -32,7 +32,6 @@ from training.configs.config import (
     BATCH_SIZE,
     DATASET_DIR,
     EPOCHS,
-    KAGGLE_DATASET_NAME,
     LEARNING_RATE,
     METRICS_DIR,
     MODEL_DIR,
@@ -51,7 +50,6 @@ def _banner(msg: str) -> None:
 
 def run_pipeline(
     models: list[str] | None = None,
-    dataset: str | None = None,
     epochs: int = EPOCHS,
     batch_size: int = BATCH_SIZE,
     learning_rate: float = LEARNING_RATE,
@@ -65,8 +63,6 @@ def run_pipeline(
     models:
         List of models to train (``"mobilenet"``, ``"yolo"``, ``"unet"``).
         Defaults to all three.
-    dataset:
-        Explicit dataset path.  Auto-downloaded when ``None``.
     epochs:
         Training epochs.
     batch_size:
@@ -82,14 +78,10 @@ def run_pipeline(
         models = ["mobilenet", "yolo", "unet"]
 
     # ------------------------------------------------------------------
-    # Stage 1: Dataset
+    # Stage 1: Dataset (centralized pipeline — always runs)
     # ------------------------------------------------------------------
     _banner("STAGE 1 / 4 — Dataset")
-    if dataset:
-        ds_root = Path(dataset)
-        print(f"[INFO] Using provided dataset at {ds_root}")
-    else:
-        ds_root = ensure_dataset(DATASET_DIR, KAGGLE_DATASET_NAME)
+    ds_root = ensure_dataset(DATASET_DIR)
 
     # ------------------------------------------------------------------
     # Stage 2: Training
@@ -248,12 +240,6 @@ def parse_args() -> argparse.Namespace:
             "Defaults to all three (mobilenet, yolo, unet)."
         ),
     )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default=None,
-        help="Explicit dataset directory (auto-downloaded if omitted).",
-    )
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--learning-rate", type=float, default=LEARNING_RATE)
@@ -275,7 +261,6 @@ if __name__ == "__main__":
 
     run_pipeline(
         models=args.model,
-        dataset=args.dataset,
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,

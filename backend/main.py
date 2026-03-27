@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.routes import router
 from backend.configs.config import get_settings
-from backend.model_loader.loader import load_models
+from backend.model_loader.loader import ModelLoadError, load_models
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -33,9 +33,16 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Startup/shutdown lifecycle handler."""
     settings = get_settings()
     logger.info("Starting dental caries detection backend")
-    logger.info("Demo mode: %s", settings.DEMO_MODE)
 
-    load_models(settings)
+    try:
+        load_models(settings)
+    except ModelLoadError as exc:
+        logger.error(
+            "Model loading failed: %s. "
+            "Run 'python -m training' to train and deploy models first.",
+            exc,
+        )
+        raise SystemExit(1) from exc
 
     yield  # application runs
 

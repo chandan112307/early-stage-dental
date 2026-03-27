@@ -8,15 +8,8 @@ Run as a standalone script::
 
     python -m training.training.train_mobilenet
 
-Or with explicit dataset path::
-
-    python -m training.training.train_mobilenet \\
-        --dataset /path/to/dataset \\
-        --epochs 50 \\
-        --batch-size 16
-
-If ``--dataset`` is omitted the script will automatically download
-the dataset from Kaggle.
+All dataset preparation is handled automatically by the centralized
+dataset pipeline — no dataset arguments are needed or accepted.
 """
 
 from __future__ import annotations
@@ -53,7 +46,6 @@ from training.configs.config import (
     DATASET_DIR,
     EARLY_STOPPING_PATIENCE,
     EPOCHS,
-    KAGGLE_DATASET_NAME,
     LEARNING_RATE,
     METRICS_DIR,
     MIN_LR,
@@ -262,42 +254,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train MobileNetV2 for dental caries classification.",
     )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default=None,
-        help=(
-            "Root directory of the image dataset.  "
-            "If omitted the dataset is downloaded automatically from Kaggle."
-        ),
-    )
-    # Keep --data-dir as a hidden alias for backwards compatibility
-    parser.add_argument("--data-dir", type=str, default=None, dest="data_dir_compat")
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--learning-rate", type=float, default=LEARNING_RATE)
-    parser.add_argument("--output-dir", type=str, default=str(OUTPUT_DIR))
-    parser.add_argument("--model-dir", type=str, default=str(MODEL_DIR))
-    parser.add_argument("--metrics-dir", type=str, default=str(METRICS_DIR))
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
 
-    # Resolve dataset path: explicit arg → auto-download
-    explicit = args.dataset or args.data_dir_compat
-    if explicit:
-        data_dir = Path(explicit)
-    else:
-        data_dir = ensure_dataset(DATASET_DIR, KAGGLE_DATASET_NAME)
+    # Centralized dataset pipeline — always runs
+    data_dir = ensure_dataset(DATASET_DIR)
 
     train(
         data_dir=data_dir,
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
-        output_dir=args.output_dir,
-        model_dir=args.model_dir,
-        metrics_dir=args.metrics_dir,
     )
