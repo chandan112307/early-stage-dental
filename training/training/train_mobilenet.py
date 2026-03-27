@@ -204,7 +204,7 @@ def train(
         ),
         ModelCheckpoint(
             checkpoint_path,
-            monitor="val_accuracy",
+            monitor="val_loss",
             save_best_only=True,
             verbose=1,
         ),

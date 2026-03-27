@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.whl
+venv/
+env/
+.env
+.venv
+
+# Node / React
+node_modules/
+frontend/build/
+frontend/node_modules/
+.npm
+*.tgz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (large binary files)
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.pb
+*.weights
+
+# Data
+*.zip
+*.tar.gz
+*.csv
+!training/configs/*.csv
+
+# Logs
+*.log
+logs/
+
+# Outputs
+backend/outputs/
+training/outputs/
+
+# Coverage
+coverage/
+.coverage
+htmlcov/
