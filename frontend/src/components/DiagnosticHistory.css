@@ -1,0 +1,161 @@
+.diagnostic-history {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.diagnostic-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.diagnostic-history-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.diagnostic-history-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: #EDE9FE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diagnostic-history-icon svg {
+  width: 16px;
+  height: 16px;
+  color: #7C3AED;
+}
+
+.diagnostic-history-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.diagnostic-history-view-all {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  transition: background 0.2s ease-in-out;
+}
+
+.diagnostic-history-view-all:hover {
+  background: var(--color-primary-light);
+  text-decoration: none;
+}
+
+.diagnostic-history-scroll {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.diagnostic-history-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.diagnostic-history-scroll::-webkit-scrollbar-track {
+  background: var(--color-bg);
+  border-radius: 3px;
+}
+
+.diagnostic-history-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+.diagnostic-history-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-light);
+}
+
+.diagnostic-card {
+  flex: 0 0 280px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  position: relative;
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+.diagnostic-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.diagnostic-card.ok {
+  border-left: 3px solid var(--color-primary);
+}
+
+.diagnostic-card.warning {
+  border-left: 3px solid var(--color-danger);
+}
+
+.diagnostic-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.diagnostic-card-date {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+}
+
+.diagnostic-card-status {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diagnostic-card-status.ok {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.diagnostic-card-status.warning {
+  background: #FEE2E2;
+  color: var(--color-danger);
+}
+
+.diagnostic-card-status svg {
+  width: 14px;
+  height: 14px;
+}
+
+.diagnostic-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.diagnostic-card-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
