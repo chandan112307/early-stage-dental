@@ -118,21 +118,39 @@ def _convert_supervisely(
     print("[INFO] Converting Supervisely dataset …")
 
     cls_dir = dataset_path / "classification"
-    det_img_dir = dataset_path / "detection" / "images"
-    det_lbl_dir = dataset_path / "detection" / "labels"
+    det_dir = dataset_path / "detection"
+    det_img_train = det_dir / "images" / "train"
+    det_img_val = det_dir / "images" / "val"
+    det_lbl_train = det_dir / "labels" / "train"
+    det_lbl_val = det_dir / "labels" / "val"
     seg_img_dir = dataset_path / "segmentation" / "images"
     seg_mask_dir = dataset_path / "segmentation" / "masks"
 
-    for d in [cls_dir, det_img_dir, det_lbl_dir, seg_img_dir, seg_mask_dir]:
+    for d in [
+        cls_dir / "caries",
+        cls_dir / "no_caries",
+        det_img_train,
+        det_img_val,
+        det_lbl_train,
+        det_lbl_val,
+        seg_img_dir,
+        seg_mask_dir,
+    ]:
         d.mkdir(parents=True, exist_ok=True)
-
-    (cls_dir / "caries").mkdir(exist_ok=True)
-    (cls_dir / "no_caries").mkdir(exist_ok=True)
 
     import cv2
     import numpy as np
 
-    for ann_file in ann_dir.glob("*.json"):
+    # Collect all annotation files first so we can split into train/val
+    ann_files = sorted(ann_dir.glob("*.json"))
+
+    # Determine train/val split (80/20)
+    np.random.seed(42)
+    indices = np.random.permutation(len(ann_files))
+    split_idx = int(len(ann_files) * 0.8)
+    train_indices = set(indices[:split_idx].tolist())
+
+    for file_idx, ann_file in enumerate(ann_files):
         with open(ann_file) as f:
             ann = json.load(f)
 
@@ -143,8 +161,8 @@ def _convert_supervisely(
 
         has_caries = False
 
+        # Copy to segmentation directory
         shutil.copy(img_path, seg_img_dir / img_name)
-        shutil.copy(img_path, det_img_dir / img_name)
 
         img = cv2.imread(str(img_path))
         h, w = img.shape[:2]
@@ -157,16 +175,30 @@ def _convert_supervisely(
                 has_caries = True
                 points = obj.get("points", {}).get("exterior", [])
                 if len(points) >= 2:
-                    x1, y1 = points[0]
-                    x2, y2 = points[1]
-                    xc = ((x1 + x2) / 2) / w
-                    yc = ((y1 + y2) / 2) / h
-                    bw = abs(x2 - x1) / w
-                    bh = abs(y2 - y1) / h
-                    yolo_labels.append(f"0 {xc} {yc} {bw} {bh}")
-                    mask[int(y1):int(y2), int(x1):int(x2)] = 255
+                    # Compute bounding box from ALL polygon points
+                    xs = [p[0] for p in points]
+                    ys = [p[1] for p in points]
+                    x_min, x_max = min(xs), max(xs)
+                    y_min, y_max = min(ys), max(ys)
 
-        with open(det_lbl_dir / (ann_file.stem + ".txt"), "w") as f:
+                    xc = ((x_min + x_max) / 2) / w
+                    yc = ((y_min + y_max) / 2) / h
+                    bw = (x_max - x_min) / w
+                    bh = (y_max - y_min) / h
+                    yolo_labels.append(f"0 {xc} {yc} {bw} {bh}")
+
+                    # Create accurate polygon mask using cv2.fillPoly
+                    poly = np.array(points, dtype=np.int32)
+                    cv2.fillPoly(mask, [poly], 255)
+
+        # Determine train or val split for detection
+        is_train = file_idx in train_indices
+        det_img_dst = det_img_train if is_train else det_img_val
+        det_lbl_dst = det_lbl_train if is_train else det_lbl_val
+
+        shutil.copy(img_path, det_img_dst / img_name)
+
+        with open(det_lbl_dst / (ann_file.stem + ".txt"), "w") as f:
             f.write("\n".join(yolo_labels))
 
         cv2.imwrite(str(seg_mask_dir / img_name), mask)
@@ -176,13 +208,14 @@ def _convert_supervisely(
         else:
             shutil.copy(img_path, cls_dir / "no_caries" / img_name)
 
+    # data.yaml with relative paths (relative to the yaml file location)
     yaml_content = (
-        f"train: {det_img_dir}\n"
-        f"val: {det_img_dir}\n"
-        f"nc: 1\n"
-        f"names: ['caries']\n"
+        "train: images/train\n"
+        "val: images/val\n"
+        "nc: 1\n"
+        "names: ['caries']\n"
     )
-    with open(dataset_path / "detection" / "data.yaml", "w") as f:
+    with open(det_dir / "data.yaml", "w") as f:
         f.write(yaml_content)
 
     print("[INFO] Conversion complete")

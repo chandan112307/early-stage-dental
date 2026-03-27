@@ -380,8 +380,9 @@ if __name__ == "__main__":
     # Centralized dataset pipeline — always runs
     ds_root = ensure_dataset(DATASET_DIR)
 
-    image_dir = _find_subdir(ds_root, "images", "image", "imgs", "img")
-    mask_dir = _find_subdir(ds_root, "masks", "mask", "labels", "label")
+    seg_root = ds_root / "segmentation"
+    image_dir = _find_subdir(seg_root, "images", "image", "imgs", "img")
+    mask_dir = _find_subdir(seg_root, "masks", "mask", "labels", "label")
 
     train(
         image_dir=image_dir,

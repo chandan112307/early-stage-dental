@@ -172,6 +172,7 @@ def train(
     # ------------------------------------------------------------------
     dataset = DentalDataset(
         root_dir=data_dir,
+        class_names=["no_caries", "caries"],
         target_size=MOBILENET_IMG_SIZE,
     )
     print(f"[INFO] Discovered {dataset.num_samples} images: {dataset.class_distribution}")
@@ -267,7 +268,7 @@ if __name__ == "__main__":
     data_dir = ensure_dataset(DATASET_DIR)
 
     train(
-        data_dir=data_dir,
+        data_dir=data_dir / "classification",
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,

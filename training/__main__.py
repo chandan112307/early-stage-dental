@@ -154,7 +154,7 @@ def _train_mobilenet(
     from training.training.train_mobilenet import train
 
     return train(
-        data_dir=ds_root,
+        data_dir=ds_root / "classification",
         epochs=epochs,
         batch_size=batch_size,
         learning_rate=learning_rate,
@@ -201,8 +201,9 @@ def _train_unet(
     print("\n--- Training U-Net segmentor ---")
     from training.training.train_unet import _find_subdir, train
 
-    image_dir = _find_subdir(ds_root, "images", "image", "imgs", "img")
-    mask_dir = _find_subdir(ds_root, "masks", "mask", "labels", "label")
+    seg_root = ds_root / "segmentation"
+    image_dir = _find_subdir(seg_root, "images", "image", "imgs", "img")
+    mask_dir = _find_subdir(seg_root, "masks", "mask", "labels", "label")
 
     return train(
         image_dir=image_dir,
