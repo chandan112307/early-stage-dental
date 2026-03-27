@@ -253,7 +253,7 @@ def train(
     output_dir: str | Path = OUTPUT_DIR,
     model_dir: str | Path = MODEL_DIR,
     metrics_dir: str | Path = METRICS_DIR,
-) -> None:
+) -> Path:
     """Run the full U-Net segmentation training loop.
 
     Parameters
@@ -274,6 +274,11 @@ def train(
         Directory for model checkpoints.
     metrics_dir:
         Directory for training metrics JSON.
+
+    Returns
+    -------
+    Path
+        Path to the saved best model checkpoint.
     """
     tf.random.set_seed(SEED)
     np.random.seed(SEED)
@@ -347,6 +352,8 @@ def train(
         json.dump(serializable, f, indent=2)
     print(f"[INFO] Training history saved to {metrics_path}")
     print(f"[INFO] Best model saved to {checkpoint_path}")
+
+    return Path(checkpoint_path)
 
 
 # ------------------------------------------------------------------

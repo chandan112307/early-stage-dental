@@ -65,7 +65,7 @@ def train(
     output_dir: str | Path = OUTPUT_DIR,
     model_dir: str | Path = MODEL_DIR,
     metrics_dir: str | Path = METRICS_DIR,
-) -> None:
+) -> Path | None:
     """Train a YOLOv8 model for dental caries detection.
 
     Parameters
@@ -88,6 +88,11 @@ def train(
         Directory to copy the best model weights.
     metrics_dir:
         Directory to save training metrics JSON.
+
+    Returns
+    -------
+    Path | None
+        Path to the saved best model weights, or ``None`` if not found.
     """
     # Lazy import so the module can be loaded without ultralytics installed
     from ultralytics import YOLO  # type: ignore[import-untyped]
@@ -127,6 +132,8 @@ def train(
         import shutil
         shutil.copy2(best_weights, dest)
         print(f"[INFO] Best YOLO weights saved to {dest}")
+    else:
+        dest = None
 
     # ------------------------------------------------------------------
     # Persist metrics
@@ -142,6 +149,8 @@ def train(
     with open(metrics_path, "w") as f:
         json.dump(metrics, f, indent=2)
     print(f"[INFO] YOLO metrics saved to {metrics_path}")
+
+    return dest
 
 
 # ------------------------------------------------------------------
