@@ -56,7 +56,6 @@ def export_mobilenet_to_onnx(
     Path
         Path to the exported ONNX file.
     """
-    import numpy as np
     import tensorflow as tf
 
     keras_path = Path(keras_path)
@@ -149,7 +148,6 @@ def export_unet_to_onnx(
     Path
         Path to the exported ONNX file.
     """
-    import numpy as np
     import tensorflow as tf
 
     keras_path = Path(keras_path)
