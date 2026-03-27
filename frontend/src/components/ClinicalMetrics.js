@@ -11,10 +11,22 @@ export default function ClinicalMetrics() {
       .then((data) => {
         const display = [];
         if (data.classifier) {
-          if (data.classifier.accuracy != null) display.push({ label: 'Accuracy', value: `${(data.classifier.accuracy * 100).toFixed(1)}%` });
-          if (data.classifier.precision != null) display.push({ label: 'Precision', value: `${(data.classifier.precision * 100).toFixed(1)}%` });
-          if (data.classifier.recall != null) display.push({ label: 'Recall', value: `${(data.classifier.recall * 100).toFixed(1)}%` });
-          if (data.classifier.f1_score != null) display.push({ label: 'F1-Score', value: data.classifier.f1_score.toFixed(3) });
+          const fields = [
+            ['accuracy', 'Accuracy', true],
+            ['precision', 'Precision', true],
+            ['recall', 'Recall', true],
+            ['f1_score', 'F1-Score', false],
+          ];
+          for (const [key, label, isPercent] of fields) {
+            if (data.classifier[key] != null) {
+              display.push({
+                label,
+                value: isPercent
+                  ? `${(data.classifier[key] * 100).toFixed(1)}%`
+                  : data.classifier[key].toFixed(3),
+              });
+            }
+          }
         }
         setMetrics(display.length > 0 ? display : null);
       })
