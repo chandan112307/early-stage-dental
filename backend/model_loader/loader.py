@@ -1,4 +1,9 @@
-"""Model loader with singleton pattern and graceful demo fallback."""
+"""Model loader with singleton pattern.
+
+All three ONNX model files must be present.  If any model is missing or
+fails to load, the system raises an error — there is no demo mode or
+synthetic fallback.
+"""
 
 from __future__ import annotations
 
@@ -12,43 +17,50 @@ from backend.configs.config import Settings, get_settings
 logger = logging.getLogger(__name__)
 
 
+class ModelLoadError(Exception):
+    """Raised when one or more required models cannot be loaded."""
+
+
 @dataclass
 class LoadedModels:
     """Container for loaded model objects."""
 
-    classifier: Any | None = None
-    detector: Any | None = None
-    segmentor: Any | None = None
-    demo_mode: bool = True
+    classifier: Any = None
+    detector: Any = None
+    segmentor: Any = None
     _loaded: bool = field(default=False, repr=False)
 
 
 _models: LoadedModels | None = None
 
 
-def _try_load_onnx(path: Path, label: str) -> Any | None:
-    """Attempt to load an ONNX model file. Returns None on failure."""
+def _load_onnx(path: Path, label: str) -> Any:
+    """Load an ONNX model file.  Raises on failure."""
     if not path.exists():
-        logger.info("%s model not found at %s – using demo mode", label, path)
-        return None
+        raise ModelLoadError(
+            f"{label} model not found at {path}. "
+            f"Run the training pipeline first: python -m training"
+        )
     try:
         import onnxruntime as ort  # type: ignore[import-untyped]
 
         session = ort.InferenceSession(str(path))
         logger.info("%s model loaded from %s", label, path)
         return session
-    except Exception:
-        logger.warning(
-            "Failed to load %s model from %s – falling back to demo mode",
-            label,
-            path,
-            exc_info=True,
-        )
-        return None
+    except Exception as exc:
+        raise ModelLoadError(
+            f"Failed to load {label} model from {path}: {exc}"
+        ) from exc
 
 
 def load_models(settings: Settings | None = None) -> LoadedModels:
-    """Load all models once (singleton). Safe to call multiple times."""
+    """Load all models once (singleton). Safe to call multiple times.
+
+    Raises
+    ------
+    ModelLoadError
+        If any required model file is missing or fails to load.
+    """
     global _models  # noqa: PLW0603
     if _models is not None and _models._loaded:
         return _models
@@ -57,27 +69,11 @@ def load_models(settings: Settings | None = None) -> LoadedModels:
         settings = get_settings()
 
     models = LoadedModels()
+    models.classifier = _load_onnx(settings.classifier_path, "Classifier")
+    models.detector = _load_onnx(settings.detector_path, "Detector")
+    models.segmentor = _load_onnx(settings.segmentor_path, "Segmentor")
 
-    if not settings.DEMO_MODE:
-        models.classifier = _try_load_onnx(
-            settings.classifier_path, "Classifier"
-        )
-        models.detector = _try_load_onnx(settings.detector_path, "Detector")
-        models.segmentor = _try_load_onnx(
-            settings.segmentor_path, "Segmentor"
-        )
-        models.demo_mode = any(
-            m is None
-            for m in [models.classifier, models.detector, models.segmentor]
-        )
-    else:
-        models.demo_mode = True
-
-    if models.demo_mode:
-        logger.info("Running in DEMO mode – returning synthetic results")
-    else:
-        logger.info("All models loaded – running in PRODUCTION mode")
-
+    logger.info("All models loaded — running in PRODUCTION mode")
     models._loaded = True
     _models = models
     return models

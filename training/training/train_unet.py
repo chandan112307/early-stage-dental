@@ -8,16 +8,8 @@ Run as a standalone script::
 
     python -m training.training.train_unet
 
-Or with explicit paths::
-
-    python -m training.training.train_unet \\
-        --image-dir /path/to/images \\
-        --mask-dir  /path/to/masks \\
-        --epochs 50 \\
-        --batch-size 8
-
-If ``--dataset`` (or ``--image-dir`` / ``--mask-dir``) is omitted the
-dataset is downloaded automatically from Kaggle.
+All dataset preparation is handled automatically by the centralized
+dataset pipeline — no dataset arguments are needed or accepted.
 """
 
 from __future__ import annotations
@@ -53,7 +45,6 @@ from training.configs.config import (
     DATASET_DIR,
     EARLY_STOPPING_PATIENCE,
     EPOCHS,
-    KAGGLE_DATASET_NAME,
     LEARNING_RATE,
     METRICS_DIR,
     MIN_LR,
@@ -253,7 +244,7 @@ def train(
     output_dir: str | Path = OUTPUT_DIR,
     model_dir: str | Path = MODEL_DIR,
     metrics_dir: str | Path = METRICS_DIR,
-) -> None:
+) -> Path:
     """Run the full U-Net segmentation training loop.
 
     Parameters
@@ -274,6 +265,11 @@ def train(
         Directory for model checkpoints.
     metrics_dir:
         Directory for training metrics JSON.
+
+    Returns
+    -------
+    Path
+        Path to the saved best model checkpoint.
     """
     tf.random.set_seed(SEED)
     np.random.seed(SEED)
@@ -348,6 +344,8 @@ def train(
     print(f"[INFO] Training history saved to {metrics_path}")
     print(f"[INFO] Best model saved to {checkpoint_path}")
 
+    return Path(checkpoint_path)
+
 
 # ------------------------------------------------------------------
 # CLI entry-point
@@ -370,56 +368,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train U-Net for dental caries segmentation.",
     )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default=None,
-        help=(
-            "Root directory of the segmentation dataset.  "
-            "If omitted the dataset is downloaded automatically from Kaggle."
-        ),
-    )
-    parser.add_argument(
-        "--image-dir",
-        type=str,
-        default=None,
-        help="Directory containing training images.",
-    )
-    parser.add_argument(
-        "--mask-dir",
-        type=str,
-        default=None,
-        help="Directory containing binary segmentation masks.",
-    )
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--learning-rate", type=float, default=LEARNING_RATE)
-    parser.add_argument("--output-dir", type=str, default=str(OUTPUT_DIR))
-    parser.add_argument("--model-dir", type=str, default=str(MODEL_DIR))
-    parser.add_argument("--metrics-dir", type=str, default=str(METRICS_DIR))
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
 
-    # Resolve image/mask directories
-    if args.image_dir and args.mask_dir:
-        image_dir = Path(args.image_dir)
-        mask_dir = Path(args.mask_dir)
-    else:
-        # Need the dataset root to resolve missing dir(s)
-        if args.dataset:
-            ds_root = Path(args.dataset)
-        else:
-            ds_root = ensure_dataset(DATASET_DIR, KAGGLE_DATASET_NAME)
+    # Centralized dataset pipeline — always runs
+    ds_root = ensure_dataset(DATASET_DIR)
 
-        image_dir = Path(args.image_dir) if args.image_dir else _find_subdir(
-            ds_root, "images", "image", "imgs", "img"
-        )
-        mask_dir = Path(args.mask_dir) if args.mask_dir else _find_subdir(
-            ds_root, "masks", "mask", "labels", "label"
-        )
+    image_dir = _find_subdir(ds_root, "images", "image", "imgs", "img")
+    mask_dir = _find_subdir(ds_root, "masks", "mask", "labels", "label")
 
     train(
         image_dir=image_dir,
@@ -427,7 +389,4 @@ if __name__ == "__main__":
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
-        output_dir=args.output_dir,
-        model_dir=args.model_dir,
-        metrics_dir=args.metrics_dir,
     )

@@ -15,6 +15,7 @@ from typing import Dict, List, Tuple
 # Directory layout
 # ---------------------------------------------------------------------------
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent  # training/
+_REPO_ROOT = _PROJECT_ROOT.parent  # repository root
 
 DATA_DIR: Path = _PROJECT_ROOT / "data"
 DATASET_DIR: Path = _PROJECT_ROOT / "dataset"
@@ -23,9 +24,13 @@ MODEL_DIR: Path = _PROJECT_ROOT / "models"
 METRICS_DIR: Path = _PROJECT_ROOT / "metrics"
 
 # ---------------------------------------------------------------------------
-# Kaggle dataset identifier (used for automatic download)
+# Backend deployment paths (for automated ONNX export + deploy)
 # ---------------------------------------------------------------------------
-KAGGLE_DATASET_NAME: str = "imtkaggleteam/dental-caries"
+BACKEND_MODEL_DIR: Path = _REPO_ROOT / "backend" / "models"
+ONNX_CLASSIFIER_NAME: str = "mobilenet_classifier.onnx"
+ONNX_DETECTOR_NAME: str = "yolo_detector.onnx"
+ONNX_SEGMENTOR_NAME: str = "unet_segmentor.onnx"
+BACKEND_METRICS_FILE: str = "evaluation_metrics.json"
 
 # ---------------------------------------------------------------------------
 # Class definitions

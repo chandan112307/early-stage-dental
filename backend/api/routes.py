@@ -49,7 +49,6 @@ class SegmentationData(BaseModel):
 class ModelInfo(BaseModel):
     """Runtime information about the models."""
 
-    demo_mode: bool
     classifier_loaded: bool
     detector_loaded: bool
     segmentor_loaded: bool
@@ -73,7 +72,6 @@ class HealthResponse(BaseModel):
     """Response from the /health endpoint."""
 
     status: str
-    demo_mode: bool
     models_loaded: bool
 
 
@@ -154,7 +152,6 @@ async def predict(file: UploadFile) -> PredictionResponse:
         ],
         segmentation_data=seg_data,
         model_info=ModelInfo(
-            demo_mode=models.demo_mode,
             classifier_loaded=models.classifier is not None,
             detector_loaded=models.detector is not None,
             segmentor_loaded=models.segmentor is not None,
@@ -169,8 +166,10 @@ async def health() -> HealthResponse:
     models = get_models()
     return HealthResponse(
         status="ok",
-        demo_mode=models.demo_mode,
-        models_loaded=not models.demo_mode,
+        models_loaded=all(
+            m is not None
+            for m in [models.classifier, models.detector, models.segmentor]
+        ),
     )
 
 

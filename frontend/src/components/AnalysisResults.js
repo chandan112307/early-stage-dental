@@ -19,7 +19,6 @@ export default function AnalysisResults({ predictions, appState }) {
           </div>
           <span className="analysis-header-title">Analysis Results</span>
         </div>
-        <span className="analysis-version-badge">v2.4.1</span>
       </div>
 
       {!hasResults ? (

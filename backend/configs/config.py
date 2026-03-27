@@ -34,9 +34,6 @@ class Settings(BaseModel):
         "http://127.0.0.1:3000",
     ]
 
-    # Demo mode: auto-detected if model files are missing
-    DEMO_MODE: bool = True
-
     @property
     def classifier_path(self) -> Path:
         return self.MODEL_DIR / self.CLASSIFIER_MODEL_FILE
@@ -49,9 +46,9 @@ class Settings(BaseModel):
     def segmentor_path(self) -> Path:
         return self.MODEL_DIR / self.SEGMENTOR_MODEL_FILE
 
-    def detect_demo_mode(self) -> bool:
-        """Return True if any model file is missing."""
-        return not all(
+    def all_models_present(self) -> bool:
+        """Return True only if all required model files exist."""
+        return all(
             p.exists()
             for p in [
                 self.classifier_path,
@@ -62,16 +59,8 @@ class Settings(BaseModel):
 
 
 def get_settings() -> Settings:
-    """Create settings and auto-detect demo mode."""
+    """Create settings and ensure output directories exist."""
     settings = Settings()
-
-    # Allow override via environment variable
-    override = os.getenv("DEMO_MODE")
-    if override is not None:
-        settings.DEMO_MODE = override.lower() in ("1", "true", "yes")
-    else:
-        settings.DEMO_MODE = settings.detect_demo_mode()
-
     settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     settings.MODEL_DIR.mkdir(parents=True, exist_ok=True)
     return settings
