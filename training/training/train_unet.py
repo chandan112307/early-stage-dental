@@ -6,11 +6,18 @@ carious regions in dental X-ray images.
 
 Run as a standalone script::
 
+    python -m training.training.train_unet
+
+Or with explicit paths::
+
     python -m training.training.train_unet \\
         --image-dir /path/to/images \\
         --mask-dir  /path/to/masks \\
         --epochs 50 \\
         --batch-size 8
+
+If ``--dataset`` (or ``--image-dir`` / ``--mask-dir``) is omitted the
+dataset is downloaded automatically from Kaggle.
 """
 
 from __future__ import annotations
@@ -43,8 +50,10 @@ if str(_PARENT) not in sys.path:
 
 from training.configs.config import (
     BATCH_SIZE,
+    DATASET_DIR,
     EARLY_STOPPING_PATIENCE,
     EPOCHS,
+    KAGGLE_DATASET_NAME,
     LEARNING_RATE,
     METRICS_DIR,
     MIN_LR,
@@ -55,6 +64,7 @@ from training.configs.config import (
     SEED,
     UNET_IMG_SIZE,
 )
+from training.data.dataset_utils import ensure_dataset
 
 _SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 
@@ -343,21 +353,42 @@ def train(
 # CLI entry-point
 # ------------------------------------------------------------------
 
+def _find_subdir(root: Path, *candidates: str) -> Path:
+    """Find the first existing sub-directory matching one of *candidates*."""
+    for name in candidates:
+        d = root / name
+        if d.is_dir():
+            return d
+    raise FileNotFoundError(
+        f"Could not locate any of {candidates} inside {root}.  "
+        "Please provide --image-dir and --mask-dir explicitly."
+    )
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Train U-Net for dental caries segmentation.",
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default=None,
+        help=(
+            "Root directory of the segmentation dataset.  "
+            "If omitted the dataset is downloaded automatically from Kaggle."
+        ),
+    )
+    parser.add_argument(
         "--image-dir",
         type=str,
-        required=True,
+        default=None,
         help="Directory containing training images.",
     )
     parser.add_argument(
         "--mask-dir",
         type=str,
-        required=True,
+        default=None,
         help="Directory containing binary segmentation masks.",
     )
     parser.add_argument("--epochs", type=int, default=EPOCHS)
@@ -371,9 +402,28 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
+
+    # Resolve image/mask directories
+    if args.image_dir and args.mask_dir:
+        image_dir = Path(args.image_dir)
+        mask_dir = Path(args.mask_dir)
+    else:
+        # Need the dataset root to resolve missing dir(s)
+        if args.dataset:
+            ds_root = Path(args.dataset)
+        else:
+            ds_root = ensure_dataset(DATASET_DIR, KAGGLE_DATASET_NAME)
+
+        image_dir = Path(args.image_dir) if args.image_dir else _find_subdir(
+            ds_root, "images", "image", "imgs", "img"
+        )
+        mask_dir = Path(args.mask_dir) if args.mask_dir else _find_subdir(
+            ds_root, "masks", "mask", "labels", "label"
+        )
+
     train(
-        image_dir=args.image_dir,
-        mask_dir=args.mask_dir,
+        image_dir=image_dir,
+        mask_dir=mask_dir,
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,

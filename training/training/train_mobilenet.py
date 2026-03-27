@@ -6,10 +6,17 @@ dense layer to predict ``No Caries`` vs ``Caries``.
 
 Run as a standalone script::
 
+    python -m training.training.train_mobilenet
+
+Or with explicit dataset path::
+
     python -m training.training.train_mobilenet \\
-        --data-dir /path/to/dataset \\
+        --dataset /path/to/dataset \\
         --epochs 50 \\
         --batch-size 16
+
+If ``--dataset`` is omitted the script will automatically download
+the dataset from Kaggle.
 """
 
 from __future__ import annotations
@@ -43,8 +50,10 @@ if str(_PARENT) not in sys.path:
 from training.configs.config import (
     BATCH_SIZE,
     CLASS_NAMES,
+    DATASET_DIR,
     EARLY_STOPPING_PATIENCE,
     EPOCHS,
+    KAGGLE_DATASET_NAME,
     LEARNING_RATE,
     METRICS_DIR,
     MIN_LR,
@@ -57,6 +66,7 @@ from training.configs.config import (
     SEED,
 )
 from training.data.dataset import DentalDataset
+from training.data.dataset_utils import ensure_dataset
 
 
 def build_mobilenet_model(
@@ -246,11 +256,16 @@ def parse_args() -> argparse.Namespace:
         description="Train MobileNetV2 for dental caries classification.",
     )
     parser.add_argument(
-        "--data-dir",
+        "--dataset",
         type=str,
-        required=True,
-        help="Root directory of the image dataset.",
+        default=None,
+        help=(
+            "Root directory of the image dataset.  "
+            "If omitted the dataset is downloaded automatically from Kaggle."
+        ),
     )
+    # Keep --data-dir as a hidden alias for backwards compatibility
+    parser.add_argument("--data-dir", type=str, default=None, dest="data_dir_compat")
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--learning-rate", type=float, default=LEARNING_RATE)
@@ -262,8 +277,16 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
+
+    # Resolve dataset path: explicit arg → auto-download
+    explicit = args.dataset or args.data_dir_compat
+    if explicit:
+        data_dir = Path(explicit)
+    else:
+        data_dir = ensure_dataset(DATASET_DIR, KAGGLE_DATASET_NAME)
+
     train(
-        data_dir=args.data_dir,
+        data_dir=data_dir,
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,

@@ -129,3 +129,33 @@ All tuneable parameters live in `configs/config.py`:
 - **MobileNetV2** – lightweight classification (transfer learning from ImageNet)
 - **YOLOv8** – real-time object detection (via Ultralytics)
 - **U-Net** – pixel-level segmentation of carious regions
+
+## Training in Colab
+
+All training scripts support **automatic dataset download**.  No manual
+Kaggle commands are needed — just upload your `kaggle.json` and run the
+script.
+
+```python
+# 1. Upload kaggle.json
+from google.colab import files
+import os, json
+
+uploaded = files.upload()  # select kaggle.json
+os.makedirs(os.path.expanduser("~/.kaggle"), exist_ok=True)
+with open(os.path.expanduser("~/.kaggle/kaggle.json"), "wb") as f:
+    f.write(uploaded["kaggle.json"])
+os.chmod(os.path.expanduser("~/.kaggle/kaggle.json"), 0o600)
+```
+
+```bash
+# 2. Install dependencies
+pip install -r training/requirements.txt kagglehub
+
+# 3. Run training (dataset downloads automatically)
+python -m training.training.train_mobilenet
+python -m training.training.train_yolo
+python -m training.training.train_unet
+```
+
+You can also pass `--dataset /path/to/local/dataset` to skip the download.

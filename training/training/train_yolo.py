@@ -15,10 +15,17 @@ directory convention::
 
 Run as a standalone script::
 
+    python -m training.training.train_yolo
+
+Or with explicit paths::
+
     python -m training.training.train_yolo \\
         --data /path/to/data.yaml \\
         --epochs 100 \\
         --batch-size 16
+
+If ``--dataset`` / ``--data`` are omitted the dataset is downloaded
+automatically from Kaggle.
 """
 
 from __future__ import annotations
@@ -35,7 +42,9 @@ if str(_PARENT) not in sys.path:
 
 from training.configs.config import (
     BATCH_SIZE,
+    DATASET_DIR,
     EPOCHS,
+    KAGGLE_DATASET_NAME,
     LEARNING_RATE,
     METRICS_DIR,
     MODEL_DIR,
@@ -43,6 +52,7 @@ from training.configs.config import (
     SEED,
     YOLO_IMG_SIZE,
 )
+from training.data.dataset_utils import ensure_dataset
 
 
 def train(
@@ -138,15 +148,52 @@ def train(
 # CLI entry-point
 # ------------------------------------------------------------------
 
+def _find_data_yaml(dataset_dir: Path) -> Path:
+    """Locate ``data.yaml`` inside a downloaded dataset directory.
+
+    Checks the root first, then searches one level deep to avoid
+    accidentally picking up an unrelated file in deeply nested dirs.
+    """
+    # Check root level first
+    root_yaml = dataset_dir / "data.yaml"
+    if root_yaml.exists():
+        return root_yaml
+
+    # One level deep
+    for child in sorted(dataset_dir.iterdir()):
+        if child.is_dir():
+            candidate = child / "data.yaml"
+            if candidate.exists():
+                return candidate
+
+    # Fall back to full recursive search
+    for candidate in dataset_dir.rglob("data.yaml"):
+        return candidate
+
+    raise FileNotFoundError(
+        f"No data.yaml found inside {dataset_dir}.  "
+        "Please provide --data /path/to/data.yaml explicitly."
+    )
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Train YOLOv8 for dental caries detection.",
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default=None,
+        help=(
+            "Root directory of the YOLO dataset.  "
+            "If omitted the dataset is downloaded automatically from Kaggle."
+        ),
+    )
+    parser.add_argument(
         "--data",
         type=str,
-        required=True,
+        default=None,
         help="Path to data.yaml for YOLO training.",
     )
     parser.add_argument(
@@ -167,8 +214,18 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
+
+    # Resolve data.yaml: explicit --data → --dataset dir → auto-download
+    if args.data:
+        data_yaml = Path(args.data)
+    elif args.dataset:
+        data_yaml = _find_data_yaml(Path(args.dataset))
+    else:
+        ds_path = ensure_dataset(DATASET_DIR, KAGGLE_DATASET_NAME)
+        data_yaml = _find_data_yaml(ds_path)
+
     train(
-        data_yaml=args.data,
+        data_yaml=data_yaml,
         model_name=args.model,
         epochs=args.epochs,
         batch_size=args.batch_size,

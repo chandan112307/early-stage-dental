@@ -17,9 +17,15 @@ from typing import Dict, List, Tuple
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent  # training/
 
 DATA_DIR: Path = _PROJECT_ROOT / "data"
+DATASET_DIR: Path = _PROJECT_ROOT / "dataset"
 OUTPUT_DIR: Path = _PROJECT_ROOT / "outputs"
 MODEL_DIR: Path = _PROJECT_ROOT / "models"
 METRICS_DIR: Path = _PROJECT_ROOT / "metrics"
+
+# ---------------------------------------------------------------------------
+# Kaggle dataset identifier (used for automatic download)
+# ---------------------------------------------------------------------------
+KAGGLE_DATASET_NAME: str = "imtkaggleteam/dental-caries"
 
 # ---------------------------------------------------------------------------
 # Class definitions
