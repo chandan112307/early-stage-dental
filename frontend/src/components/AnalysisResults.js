@@ -69,7 +69,7 @@ export default function AnalysisResults({ predictions, appState }) {
 
           <div className="analysis-meta">
             <div className="analysis-meta-label">Neural Architecture</div>
-            <div className="analysis-meta-value">MobileNet V3 Large</div>
+            <div className="analysis-meta-value">MobileNetV2</div>
           </div>
 
           {predictions?.inference_time_ms && (
