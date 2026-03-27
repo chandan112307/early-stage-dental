@@ -69,8 +69,15 @@ export default function AnalysisResults({ predictions, appState }) {
 
           <div className="analysis-meta">
             <div className="analysis-meta-label">Neural Architecture</div>
-            <div className="analysis-meta-value">MobileNetV2</div>
+            <div className="analysis-meta-value">MobileNet V3 Large</div>
           </div>
+
+          {predictions?.inference_time_ms && (
+            <div className="analysis-meta">
+              <div className="analysis-meta-label">Inference Time</div>
+              <div className="analysis-meta-value">{predictions.inference_time_ms}ms</div>
+            </div>
+          )}
 
           <button className="analysis-download-btn" aria-label="Download clinical report">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -50,9 +50,8 @@ export default function App() {
       const result = await predictImage(file);
 
       const hasCaries =
-        result.classification === 'caries' ||
-        result.classification === 'Caries' ||
-        (result.detections && result.detections.length > 0);
+        result.prediction === 'Caries' ||
+        (result.bounding_boxes && result.bounding_boxes.length > 0);
 
       setState((prev) => ({
         ...prev,

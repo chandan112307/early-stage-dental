@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import UploadArea from './UploadArea';
 import './XRayViewer.css';
 
@@ -13,6 +13,46 @@ export default function XRayViewer({
   const showOverlays = appState === 'success' && predictions;
   const isNoCaries = appState === 'no-caries';
 
+  const imgRef = useRef(null);
+  const [imgSize, setImgSize] = useState({ width: 0, height: 0, naturalWidth: 1, naturalHeight: 1 });
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const update = () => {
+      setImgSize({
+        width: img.clientWidth,
+        height: img.clientHeight,
+        naturalWidth: img.naturalWidth || 1,
+        naturalHeight: img.naturalHeight || 1,
+      });
+    };
+    img.addEventListener('load', update);
+    window.addEventListener('resize', update);
+    update();
+    return () => {
+      img.removeEventListener('load', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [imageUrl, appState]);
+
+  /* Convert pixel-based bounding boxes to percentage positions relative to image */
+  const toPercent = (box) => {
+    const { naturalWidth: nw, naturalHeight: nh } = imgSize;
+    return {
+      left: `${(box.x_min / nw) * 100}%`,
+      top: `${(box.y_min / nh) * 100}%`,
+      width: `${((box.x_max - box.x_min) / nw) * 100}%`,
+      height: `${((box.y_max - box.y_min) / nh) * 100}%`,
+    };
+  };
+
+  /* Use annotated image from backend when available, otherwise show raw upload */
+  const displaySrc =
+    showOverlays && predictions.annotated_base64
+      ? `data:image/png;base64,${predictions.annotated_base64}`
+      : imageUrl;
+
   return (
     <div className="xray-viewer" role="img" aria-label="X-ray viewer area">
       <div className="xray-viewer-canvas">
@@ -20,8 +60,9 @@ export default function XRayViewer({
 
         {showImage && (
           <img
+            ref={imgRef}
             className="xray-viewer-image"
-            src={imageUrl}
+            src={displaySrc}
             alt="Dental X-ray being analyzed"
           />
         )}
@@ -35,36 +76,22 @@ export default function XRayViewer({
           </div>
         )}
 
-        {showOverlays && !isNoCaries && predictions.detections && (
+        {showOverlays && predictions.bounding_boxes && predictions.bounding_boxes.length > 0 && (
           <div className="xray-overlay">
-            {predictions.detections.map((det, i) => (
-              <React.Fragment key={i}>
-                {det.segmentation && (
-                  <div
-                    className="xray-segmentation"
-                    style={{
-                      left: `${det.segmentation.x}%`,
-                      top: `${det.segmentation.y}%`,
-                      width: `${det.segmentation.width}%`,
-                      height: `${det.segmentation.height}%`,
-                    }}
-                  />
-                )}
+            {predictions.bounding_boxes.map((box, i) => {
+              const pos = toPercent(box);
+              return (
                 <div
+                  key={i}
                   className="xray-bbox"
-                  style={{
-                    left: `${det.bbox.x}%`,
-                    top: `${det.bbox.y}%`,
-                    width: `${det.bbox.width}%`,
-                    height: `${det.bbox.height}%`,
-                  }}
+                  style={pos}
                 >
                   <span className="xray-bbox-label">
-                    CARIES {Math.round(det.confidence * 100)}%
+                    {box.label} {Math.round(box.confidence * 100)}%
                   </span>
                 </div>
-              </React.Fragment>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
