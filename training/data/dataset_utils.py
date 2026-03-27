@@ -111,114 +111,190 @@ def _convert_if_needed(dataset_path: Path) -> None:
         _convert_supervisely(dataset_path, img_dirs[0], ann_dirs[0])
 
 
-def _convert_supervisely(
-    dataset_path: Path, images_dir: Path, ann_dir: Path
-) -> None:
-    """Convert Supervisely (DentalAI) format into canonical structure."""
+def _convert_supervisely(dataset_path: Path, images_dir: Path, ann_dir: Path) -> None:
     print("[INFO] Converting Supervisely dataset …")
-
-    cls_dir = dataset_path / "classification"
-    det_dir = dataset_path / "detection"
-    det_img_train = det_dir / "images" / "train"
-    det_img_val = det_dir / "images" / "val"
-    det_lbl_train = det_dir / "labels" / "train"
-    det_lbl_val = det_dir / "labels" / "val"
-    seg_img_dir = dataset_path / "segmentation" / "images"
-    seg_mask_dir = dataset_path / "segmentation" / "masks"
-
-    for d in [
-        cls_dir / "caries",
-        cls_dir / "no_caries",
-        det_img_train,
-        det_img_val,
-        det_lbl_train,
-        det_lbl_val,
-        seg_img_dir,
-        seg_mask_dir,
-    ]:
-        d.mkdir(parents=True, exist_ok=True)
 
     import cv2
     import numpy as np
 
-    # Collect all annotation files first so we can split into train/val
+    # ----------------------------
+    # Directory setup
+    # ----------------------------
+    cls_dir = dataset_path / "classification"
+    det_dir = dataset_path / "detection"
+    seg_dir = dataset_path / "segmentation"
+
+    det_img_train = det_dir / "images" / "train"
+    det_img_val = det_dir / "images" / "val"
+    det_lbl_train = det_dir / "labels" / "train"
+    det_lbl_val = det_dir / "labels" / "val"
+
+    seg_img_dir = seg_dir / "images"
+    seg_mask_dir = seg_dir / "masks"
+
+    for d in [
+        cls_dir / "caries",
+        cls_dir / "no_caries",
+        det_img_train, det_img_val,
+        det_lbl_train, det_lbl_val,
+        seg_img_dir, seg_mask_dir,
+    ]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    # ----------------------------
+    # Build image index (CRITICAL FIX)
+    # ----------------------------
+    image_map = {}
+    for img_path in images_dir.rglob("*"):
+        if img_path.suffix.lower() in [".jpg", ".jpeg", ".png"]:
+            image_map[img_path.stem] = img_path
+
+    if not image_map:
+        print("[FATAL] No images found in dataset.")
+        sys.exit(1)
+
+    # ----------------------------
+    # Load annotations
+    # ----------------------------
     ann_files = sorted(ann_dir.glob("*.json"))
 
-    # Determine train/val split (80/20)
+    if not ann_files:
+        print("[FATAL] No annotation files found.")
+        sys.exit(1)
+
+    # ----------------------------
+    # Train/val split
+    # ----------------------------
     np.random.seed(42)
     indices = np.random.permutation(len(ann_files))
     split_idx = int(len(ann_files) * 0.8)
-    train_indices = set(indices[:split_idx].tolist())
+    train_indices = set(indices[:split_idx])
 
-    for file_idx, ann_file in enumerate(ann_files):
+    processed = 0
+    skipped = 0
+
+    # ----------------------------
+    # Main loop
+    # ----------------------------
+    for idx, ann_file in enumerate(ann_files):
         with open(ann_file) as f:
             ann = json.load(f)
 
-        img_name = ann_file.stem + ".jpg"
-        img_path = images_dir / img_name
-        if not img_path.exists():
+        # ----------------------------
+        # Robust image matching (FINAL FIX)
+        # ----------------------------
+        img_path = image_map.get(ann_file.stem)
+
+        if img_path is None:
+            for key in image_map:
+                if ann_file.stem in key or key in ann_file.stem:
+                    img_path = image_map[key]
+                    break
+
+        if img_path is None:
+            skipped += 1
             continue
 
-        has_caries = False
-
-        # Copy to segmentation directory
-        shutil.copy(img_path, seg_img_dir / img_name)
+        img_name = img_path.name
 
         img = cv2.imread(str(img_path))
-        h, w = img.shape[:2]
-        mask = np.zeros((h, w), dtype=np.uint8)
-        yolo_labels: list[str] = []
+        if img is None:
+            skipped += 1
+            continue
 
+        h, w = img.shape[:2]
+
+        mask = np.zeros((h, w), dtype=np.uint8)
+        yolo_labels = []
+        has_caries = False
+
+        # ----------------------------
+        # Process annotations
+        # ----------------------------
         for obj in ann.get("objects", []):
             label = obj.get("classTitle", "").lower()
-            if "caries" in label:
-                has_caries = True
-                points = obj.get("points", {}).get("exterior", [])
-                if len(points) >= 2:
-                    # Compute bounding box from ALL polygon points
-                    xs = [p[0] for p in points]
-                    ys = [p[1] for p in points]
-                    x_min, x_max = min(xs), max(xs)
-                    y_min, y_max = min(ys), max(ys)
 
-                    xc = ((x_min + x_max) / 2) / w
-                    yc = ((y_min + y_max) / 2) / h
-                    bw = (x_max - x_min) / w
-                    bh = (y_max - y_min) / h
-                    yolo_labels.append(f"0 {xc} {yc} {bw} {bh}")
+            if "caries" not in label:
+                continue
 
-                    # Create accurate polygon mask using cv2.fillPoly
-                    poly = np.array(points, dtype=np.int32)
-                    cv2.fillPoly(mask, [poly], 255)
+            has_caries = True
 
-        # Determine train or val split for detection
-        is_train = file_idx in train_indices
-        det_img_dst = det_img_train if is_train else det_img_val
-        det_lbl_dst = det_lbl_train if is_train else det_lbl_val
+            points = obj.get("points", {}).get("exterior", [])
+            if len(points) < 3:
+                continue
 
-        shutil.copy(img_path, det_img_dst / img_name)
+            poly = np.array(points, dtype=np.float32)
 
-        with open(det_lbl_dst / (ann_file.stem + ".txt"), "w") as f:
-            f.write("\n".join(yolo_labels))
+            # Bounding box
+            xs = poly[:, 0]
+            ys = poly[:, 1]
 
+            x_min, x_max = xs.min(), xs.max()
+            y_min, y_max = ys.min(), ys.max()
+
+            xc = ((x_min + x_max) / 2) / w
+            yc = ((y_min + y_max) / 2) / h
+            bw = (x_max - x_min) / w
+            bh = (y_max - y_min) / h
+
+            yolo_labels.append(f"0 {xc} {yc} {bw} {bh}")
+
+            # Segmentation mask
+            poly_int = poly.astype(np.int32)
+            cv2.fillPoly(mask, [poly_int], 255)
+
+        # ----------------------------
+        # Save segmentation
+        # ----------------------------
+        shutil.copy(img_path, seg_img_dir / img_name)
         cv2.imwrite(str(seg_mask_dir / img_name), mask)
 
+        # ----------------------------
+        # Save detection
+        # ----------------------------
+        is_train = idx in train_indices
+        img_dst = det_img_train if is_train else det_img_val
+        lbl_dst = det_lbl_train if is_train else det_lbl_val
+
+        shutil.copy(img_path, img_dst / img_name)
+
+        label_file = lbl_dst / (Path(img_name).stem + ".txt")
+        with open(label_file, "w") as f:
+            f.write("\n".join(yolo_labels))
+
+        # ----------------------------
+        # Save classification
+        # ----------------------------
         if has_caries:
             shutil.copy(img_path, cls_dir / "caries" / img_name)
         else:
             shutil.copy(img_path, cls_dir / "no_caries" / img_name)
 
-    # data.yaml with relative paths (relative to the yaml file location)
+        processed += 1
+
+    # ----------------------------
+    # Write YOLO config
+    # ----------------------------
     yaml_content = (
         "train: images/train\n"
         "val: images/val\n"
         "nc: 1\n"
         "names: ['caries']\n"
     )
+
     with open(det_dir / "data.yaml", "w") as f:
         f.write(yaml_content)
 
+    # ----------------------------
+    # Logs
+    # ----------------------------
     print("[INFO] Conversion complete")
+    print(f"[INFO] Processed: {processed} images")
+    print(f"[INFO] Skipped: {skipped} images")
+
+    if processed == 0:
+        print("[FATAL] No images were processed. Check dataset structure.")
+        sys.exit(1)
 
 
 # ------------------------------------------------------------------
