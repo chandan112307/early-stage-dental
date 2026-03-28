@@ -289,7 +289,7 @@ def train(
     # Model
     # ------------------------------------------------------------------
     model = build_unet_model(learning_rate=learning_rate)
-    model.summary()
+    # model.summary()
 
     # ------------------------------------------------------------------
     # Callbacks
