@@ -188,7 +188,7 @@ def train(
     # Model
     # ------------------------------------------------------------------
     model = build_mobilenet_model(learning_rate=learning_rate)
-    model.summary()
+    # model.summary()
 
     # ------------------------------------------------------------------
     # Callbacks
