@@ -1,22 +1,25 @@
 """Dataset loading and splitting for dental caries classification.
 
-Supports loading images from a directory organised as::
+Supports either of these directory layouts::
+
+    dataset_root/
+        classification/
+            no_caries/
+            caries/
+
+or::
 
     dataset_root/
         No Caries/
-            img_001.png
-            ...
         Caries/
-            img_001.png
-            ...
 
 The :class:`DentalDataset` class handles discovery, splitting, and
-batch generation for TensorFlow / Keras training loops.
+batch generation for TensorFlow / Keras training loops. It also tolerates
+nested image folders inside each class directory.
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -39,6 +42,10 @@ from training.preprocessing.preprocess import (
 )
 
 _SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+_CLASS_NAME_ALIASES = {
+    "caries": ("caries", "Caries"),
+    "no caries": ("no_caries", "No Caries"),
+}
 
 
 class DentalDataset:
@@ -130,7 +137,6 @@ class DentalDataset:
         paths = np.array(self._image_paths)
         labels = np.array(self._labels)
 
-        # First split: train vs. (val + test)
         val_test_ratio = self.val_ratio + self.test_ratio
         train_paths, temp_paths, train_labels, temp_labels = train_test_split(
             paths,
@@ -140,7 +146,6 @@ class DentalDataset:
             stratify=labels,
         )
 
-        # Second split: val vs. test
         relative_test = self.test_ratio / val_test_ratio
         val_paths, test_paths, val_labels, test_labels = train_test_split(
             temp_paths,
@@ -199,11 +204,36 @@ class DentalDataset:
 
     def _discover_images(self) -> None:
         """Walk the root directory and collect image paths with labels."""
+        base_dir = self._resolve_base_dir()
         for label_idx, class_name in enumerate(self.class_names):
-            class_dir = self.root_dir / class_name
+            class_dir = self._resolve_class_dir(base_dir, class_name)
             if not class_dir.is_dir():
                 continue
-            for entry in sorted(class_dir.iterdir()):
-                if entry.suffix.lower() in _SUPPORTED_EXTENSIONS:
+            for entry in sorted(class_dir.rglob("*"), key=str):
+                if entry.is_file() and entry.suffix.lower() in _SUPPORTED_EXTENSIONS:
                     self._image_paths.append(str(entry))
                     self._labels.append(label_idx)
+
+    def _resolve_base_dir(self) -> Path:
+        """Prefer the canonical classification subdirectory when present."""
+        classification_dir = self.root_dir / "classification"
+        if classification_dir.is_dir():
+            return classification_dir
+        return self.root_dir
+
+    def _resolve_class_dir(self, base_dir: Path, class_name: str) -> Path:
+        """Locate a class directory using a small alias set."""
+        for candidate_name in _candidate_class_dir_names(class_name):
+            candidate = base_dir / candidate_name
+            if candidate.is_dir():
+                return candidate
+        return base_dir / class_name
+
+
+def _candidate_class_dir_names(class_name: str) -> Tuple[str, ...]:
+    """Return likely directory names for a semantic class label."""
+    normalized = class_name.strip().lower().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    aliases = _CLASS_NAME_ALIASES.get(normalized, ())
+    ordered = dict.fromkeys((class_name, *aliases))
+    return tuple(ordered.keys())
